@@ -1,0 +1,228 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Assets - Brooks IT Inventory</title>
+<script src="/sidebar.js"></script>
+<style>
+  :root {
+    --brooks-bg: #f3f6fb;
+    --brooks-bg-2: #edf3fb;
+    --brooks-panel: #ffffff;
+    --brooks-card: #ffffff;
+    --brooks-border: #dfe7f0;
+    --brooks-text: #1f2937;
+    --brooks-muted: #5d6b7a;
+    --brooks-accent: #2d6cdf;
+    --brooks-accent-2: #1a4f8a;
+    --brooks-button: linear-gradient(135deg, #4e96ff 0%, #2d6cdf 100%);
+    --brooks-button-hover: linear-gradient(135deg, #64a9ff 0%, #3679eb 100%);
+  }
+
+  body { font-family: Arial, sans-serif; background: linear-gradient(180deg, var(--brooks-bg) 0%, var(--brooks-bg-2) 100%); color: var(--brooks-text); }
+  h1 { color: var(--brooks-accent-2); margin-top: 0; }
+  .toolbar { display: flex; gap: 10px; margin: 16px 0; flex-wrap: wrap; align-items: center; }
+  input, select { padding: 9px; border-radius: 6px; border: 1px solid var(--brooks-border); background: #ffffff; color: var(--brooks-text); }
+  #search { flex: 1; min-width: 200px; }
+  .add-btn { padding: 10px 18px; background: var(--brooks-button); color: #ffffff; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; text-decoration: none; display: inline-block; box-shadow: 0 8px 18px rgba(45, 108, 223, 0.18); }
+  .add-btn:hover { background: var(--brooks-button-hover); }
+  th { text-align: left; padding: 6px 8px; background: #edf3fb; color: var(--brooks-accent-2); font-size: 12px; text-transform: uppercase; font-weight: bold; letter-spacing: 0.4px; border-bottom: 1px solid var(--brooks-border); border-right: 1px solid var(--brooks-border); }
+  td { padding: 4px 8px; font-size: 14px; border: none; border-right: 1px solid var(--brooks-border); }
+  tbody tr { border-bottom: 1px solid #edf3fb; }
+  tbody tr:nth-child(odd) { background: #86a4d4; }
+  tbody tr:nth-child(even) { background: #f3f2f2; }
+  tbody tr:nth-child(odd):hover { background: #6f91c7; }
+  tbody tr:nth-child(even):hover { background: #e5e4e4; }
+  .status-badge { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 20px; font-size: 12px; font-weight: bold; }
+  .status-dot { width: 8px; height: 8px; border-radius: 50%; }
+  .actions { display: flex; gap: 6px; }
+  .view-btn { background: #edf3fb; color: var(--brooks-text); border: none; padding: 6px 10px; border-radius: 4px; font-size: 12px; cursor: pointer; text-decoration: none; }
+  .view-btn:hover { background: #e2ebf8; }
+  .edit-btn { background: #2d6cdf; color: white; border: none; padding: 6px 10px; border-radius: 4px; font-size: 12px; cursor: pointer; text-decoration: none; }
+  .edit-btn:hover { background: #3d7ce4; }
+  .del-btn { background: #c1543a; color: white; border: none; padding: 6px 10px; border-radius: 4px; font-size: 12px; cursor: pointer; }
+  .del-btn:hover { background: #d9634a; }
+  .empty { text-align: center; padding: 40px; color: var(--brooks-muted); }
+  .count { color: var(--brooks-muted); font-size: 13px; margin-bottom: 6px; }
+  .table-wrapper { width: 100%; overflow-x: auto; border-radius: 8px; border: 1px solid var(--brooks-border); background: #ffffff; }
+  table { width: max-content; min-width: 100%; border-collapse: collapse; margin-top: 0; }
+  th, td { white-space: nowrap; }
+  th:last-child, td:last-child { border-right: none; }
+  #mainContent { max-width: none !important; }
+</style>
+</head>
+<body>
+  <h1>Brooks IT Inventory - Assets</h1>
+
+  <div class="toolbar">
+    <input type="text" id="search" placeholder="Search Service Tag, Serial Number, or Host Name...">
+    <select id="statusFilter"><option value="">All Statuses</option></select>
+    <select id="hwFilter"><option value="">All Hardware Types</option></select>
+    <a class="add-btn" href="/add-asset.html">+ Add New Asset</a>
+    <a class="add-btn" href="/bulk-add-asset.html">+ Bulk Add</a>
+    <button class="add-btn" onclick="openBulkEdit()">Bulk Edit Selected</button>
+  </div>
+
+  <div class="count" id="count"></div>
+  <div class="table-wrapper">
+  <table>
+    <thead>
+      <tr>
+        <th><input type="checkbox" id="selectAll" onchange="toggleAll(this.checked)"></th>
+        <th>Service Tag (ST)</th>
+        <th>Serial Number (S/N)</th>
+        <th>Host Name</th>
+        <th>Hardware Type</th>
+        <th>Model</th>
+        <th>Category</th>
+        <th>Status</th>
+        <th>Owner</th>
+        <th>Location</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody id="tableBody"></tbody>
+  </table>
+  </div>
+  <div id="emptyState" class="empty" style="display:none">No assets found.</div>
+
+<script>
+let allAssets = [];
+
+async function loadFilters() {
+  const statusRes = await fetch('/api/statuses');
+  const statuses = await statusRes.json();
+  const statusFilter = document.getElementById('statusFilter');
+  statuses.forEach(s => {
+    const opt = document.createElement('option');
+    opt.value = s.name;
+    opt.textContent = s.name;
+    statusFilter.appendChild(opt);
+  });
+
+  const hwRes = await fetch('/api/hardware-types');
+  const hwTypes = await hwRes.json();
+  const hwFilter = document.getElementById('hwFilter');
+  hwTypes.forEach(h => {
+    const opt = document.createElement('option');
+    opt.value = h.name;
+    opt.textContent = h.name;
+    hwFilter.appendChild(opt);
+  });
+}
+
+async function loadAssets() {
+  const res = await fetch('/api/assets');
+  allAssets = await res.json();
+  renderTable();
+}
+
+function renderTable() {
+  const search = document.getElementById('search').value.toLowerCase();
+  const statusVal = document.getElementById('statusFilter').value;
+  const hwVal = document.getElementById('hwFilter').value;
+
+  const filtered = allAssets.filter(a => {
+    const matchesSearch = !search ||
+      (a.service_tag && a.service_tag.toLowerCase().includes(search)) ||
+      (a.serial_number && a.serial_number.toLowerCase().includes(search)) ||
+      (a.host_name && a.host_name.toLowerCase().includes(search)) ||
+      (a.hardware_type_name && a.hardware_type_name.toLowerCase().includes(search));
+    const matchesStatus = !statusVal || a.status_name === statusVal;
+    const matchesHw = !hwVal || a.hardware_type_name === hwVal;
+    return matchesSearch && matchesStatus && matchesHw;
+  });
+
+  const tbody = document.getElementById('tableBody');
+  const emptyState = document.getElementById('emptyState');
+  const count = document.getElementById('count');
+  count.textContent = `${filtered.length} asset(s)`;
+
+  if (filtered.length === 0) {
+    tbody.innerHTML = '';
+    emptyState.style.display = 'block';
+    return;
+  }
+  emptyState.style.display = 'none';
+
+  tbody.innerHTML = filtered.map(a => `
+    <tr>
+     <td><input type="checkbox" class="asset-check" value="${a.id}" onchange="updateSelection()"></td>
+      <td>${a.service_tag || '-'}</td>
+      <td>${a.serial_number || '-'}</td>
+      <td>${a.host_name || '-'}</td>
+      <td>${a.hardware_type_name}</td>
+      <td>${a.model_name || '-'}</td>
+      <td>${a.category_name}</td>
+      <td><span class="status-badge" style="background:color-mix(in srgb, ${a.status_color} 24%, white); border:1px solid ${a.status_color}88; color:#1f2937"><span class="status-dot" style="background:${a.status_color}"></span>${a.status_name}</span></td>
+      <td>${a.asset_owner || '-'}</td>
+      <td>${a.location || '-'}</td>
+      <td>
+        <div class="actions">
+          <a class="view-btn" href="/view-asset.html?id=${a.id}">View</a>
+          <a class="edit-btn" href="/edit-asset.html?id=${a.id}">Edit</a>
+          <button class="del-btn" onclick="deleteAsset(${a.id})">Delete</button>
+        </div>
+      </td>
+    </tr>
+  `).join('');
+}
+
+async function deleteAsset(id) {
+  if (!confirm('Delete this asset?')) return;
+  await fetch(`/api/assets/${id}`, { method: 'DELETE' });
+  loadAssets();
+}
+
+document.getElementById('search').addEventListener('input', renderTable);
+document.getElementById('statusFilter').addEventListener('change', renderTable);
+document.getElementById('hwFilter').addEventListener('change', renderTable);
+document.getElementById('selectAll').addEventListener('change', e => toggleAll(e.target.checked));
+
+function selectedIds() {
+  return [...document.querySelectorAll('.asset-check:checked')].map(x => Number(x.value));
+}
+function toggleAll(checked) {
+  document.querySelectorAll('.asset-check').forEach(x => x.checked = checked);
+}
+function updateSelection() {
+  const checks = [...document.querySelectorAll('.asset-check')];
+  document.getElementById('selectAll').checked = checks.length > 0 && checks.every(x => x.checked);
+}
+function openBulkEdit() {
+  const ids = selectedIds();
+  if (!ids.length) {
+    alert('Select at least one asset. ');
+    return;
+  }
+  window.location.href = `/bulk-edit-asset.html?ids=${ids.join(',')}`;
+}
+function previewBulkEdit() {
+  const panel = document.getElementById('bulkEditPanel');
+  const fields = [...panel.querySelectorAll('input[data-field]:checked')].map(x => x.dataset.field);
+  if (!fields.length) { alert('Pilih sekurang-kurangnya satu medan.'); return; }
+  panel.querySelector('#bulkPreview').innerHTML = `<p>${selectedIds().length} aset akan dikemaskini.</p>
+    <button class="edit-btn" onclick="applyBulkEdit()">Confirm & Apply</button>`;
+}
+async function applyBulkEdit() {
+  const panel = document.getElementById('bulkEditPanel');
+  const inputIds = { status_id: 'bulkStatus', location: 'bulkLocation', asset_owner: 'bulkOwner', remark: 'bulkRemark' };
+  const updates = {};
+  panel.querySelectorAll('input[data-field]:checked').forEach(check => {
+    const field = check.dataset.field;
+    updates[field] = panel.querySelector('#' + inputIds[field]).value;
+  });
+  const res = await fetch('/api/assets/bulk-update', {
+    method: 'PUT', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ids: selectedIds(), updates})
+  });
+  const data = await res.json();
+  if (!res.ok) { alert(data.error || 'Bulk edit gagal.'); return; }
+  panel.remove(); await loadAssets();
+}
+
+loadFilters();
+loadAssets();
+</script>
+</body>
+</html>

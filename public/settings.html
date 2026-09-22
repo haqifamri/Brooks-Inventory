@@ -1,0 +1,420 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Settings - Brooks IT Inventory</title>
+<script src="/sidebar.js"></script>
+<style>
+  body { font-family: Arial, sans-serif; background: #f2f6fb; color: #1f2937; }
+  h1 { color: #1a4f8a; margin-top: 0; }
+  .tabs { display: flex; gap: 4px; margin-bottom: 20px; border-bottom: 1px solid #dfe7f0; }
+  .tab-btn { padding: 10px 18px; background: none; border: none; color: #5d6b7a; cursor: pointer; font-size: 14px; border-bottom: 2px solid transparent; }
+  .tab-btn:hover { color: #1f2937; }
+  .tab-btn.active { color: #1a4f8a; border-bottom: 2px solid #1a4f8a; }
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; }
+  .form-box { background: #ffffff; padding: 20px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #dfe7f0; box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04); }
+  select, input[type=text] { padding: 10px; border-radius: 6px; border: 1px solid #dfe7f0; background: #ffffff; color: #1f2937; margin-right: 8px; margin-bottom: 8px; }
+  select { width: 35%; }
+  input[type=text] { width: 35%; }
+  input[type=color] { width: 50px; height: 42px; padding: 2px; border-radius: 6px; border: 1px solid #dfe7f0; background: #ffffff; cursor: pointer; margin-right: 8px; vertical-align: middle; }
+  button.add-item { padding: 10px 16px; background: linear-gradient(135deg, #4e96ff 0%, #2d6cdf 100%); color: #ffffff; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; }
+  button.add-item:hover { background: linear-gradient(135deg, #64a9ff 0%, #3679eb 100%); }
+  ul { list-style: none; padding: 0; }
+  li { background: #ffffff; padding: 12px 16px; margin-bottom: 8px; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; border: 1px solid #dfe7f0; }
+  .li-left { display: flex; flex-direction: column; }
+  .li-left-row { display: flex; align-items: center; gap: 10px; }
+  .tag { font-size: 11px; color: #1a4f8a; text-transform: uppercase; }
+  .swatch { width: 18px; height: 18px; border-radius: 4px; border: 1px solid #dfe7f0; display: inline-block; }
+  .item-actions { display: flex; gap: 6px; }
+  .edit-btn { background: #2d6cdf; color: white; padding: 6px 12px; font-size: 12px; border: none; border-radius: 4px; cursor: pointer; }
+  .edit-btn:hover { background: #3d7ce4; }
+  .del-btn { background: #c1543a; color: white; padding: 6px 12px; font-size: 12px; border: none; border-radius: 4px; cursor: pointer; }
+  .del-btn:hover { background: #d9634a; }
+  .save-btn { background: #3aa56a; color: white; padding: 6px 12px; font-size: 12px; border: none; border-radius: 4px; cursor: pointer; }
+  .save-btn:hover { background: #49b879; }
+  .cancel-btn { background: #edf3fb; color: #1f2937; padding: 6px 12px; font-size: 12px; border: none; border-radius: 4px; cursor: pointer; }
+  .cancel-btn:hover { background: #e2ebf8; }
+  .msg { margin-top: 10px; font-size: 14px; }
+  .edit-row { display: flex; gap: 6px; align-items: center; flex: 1; flex-wrap: wrap; }
+  .edit-row input[type=text], .edit-row select { margin: 0; }
+</style>
+</head>
+<body>
+  <h1>Settings</h1>
+
+  <div class="tabs">
+    <button class="tab-btn active" onclick="switchTab('hw')" id="tabBtn-hw">Hardware Types</button>
+    <button class="tab-btn" onclick="switchTab('cat')" id="tabBtn-cat">Categories</button>
+    <button class="tab-btn" onclick="switchTab('status')" id="tabBtn-status">Statuses</button>
+    <button class="tab-btn" onclick="switchTab('model')" id="tabBtn-model">Models</button>
+  </div>
+
+  <!-- HARDWARE TYPES -->
+  <div class="tab-panel active" id="panel-hw">
+    <div class="form-box">
+      <input type="text" id="hwNameInput" placeholder="Example: Printer">
+      <button class="add-item" onclick="addHardwareType()">+ Add</button>
+      <div class="msg" id="hwMsg"></div>
+    </div>
+    <ul id="hwList"></ul>
+  </div>
+
+  <!-- CATEGORIES -->
+  <div class="tab-panel" id="panel-cat">
+    <div class="form-box">
+      <select id="catHwSelect"></select>
+      <input type="text" id="catNameInput" placeholder="Example: Laptop - User">
+      <button class="add-item" onclick="addCategory()">+ Add</button>
+      <div class="msg" id="catMsg"></div>
+    </div>
+    <ul id="catList"></ul>
+  </div>
+
+  <!-- STATUSES -->
+  <div class="tab-panel" id="panel-status">
+    <div class="form-box">
+      <input type="color" id="statusColorInput" value="#4CAF50">
+      <input type="text" id="statusNameInput" placeholder="Example: Ready for Onboarding">
+      <button class="add-item" onclick="addStatus()">+ Add</button>
+      <div class="msg" id="statusMsg"></div>
+    </div>
+    <ul id="statusList"></ul>
+  </div>
+
+  <!-- MODELS -->
+  <div class="tab-panel" id="panel-model">
+    <div class="form-box">
+      <select id="modelHwSelect"></select>
+      <input type="text" id="modelNameInput" placeholder="Example: Latitude 5450">
+      <button class="add-item" onclick="addModel()">+ Add</button>
+      <div class="msg" id="modelMsg"></div>
+    </div>
+    <ul id="modelList"></ul>
+  </div>
+
+<script>
+let allHwTypes = [];
+
+function switchTab(tab) {
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('panel-' + tab).classList.add('active');
+  document.getElementById('tabBtn-' + tab).classList.add('active');
+}
+
+function hwOptionsHtml(selectedId) {
+  return allHwTypes.map(h => `<option value="${h.id}" ${String(h.id) === String(selectedId) ? 'selected' : ''}>${h.name}</option>`).join('');
+}
+
+// ===== HARDWARE TYPES =====
+let hwData = [];
+async function loadHwList() {
+  const res = await fetch('/api/hardware-types');
+  hwData = await res.json();
+  renderHwList();
+  return hwData;
+}
+
+function renderHwList(editingId) {
+  document.getElementById('hwList').innerHTML = hwData.map(item => {
+    if (item.id === editingId) {
+      return `<li>
+        <div class="edit-row">
+          <input type="text" id="hwEditName-${item.id}" value="${item.name}">
+        </div>
+        <div class="item-actions">
+          <button class="save-btn" onclick="saveHwEdit(${item.id})">Save</button>
+          <button class="cancel-btn" onclick="renderHwList()">Cancel</button>
+        </div>
+      </li>`;
+    }
+    return `<li>
+      <span>${item.name}</span>
+      <div class="item-actions">
+        <button class="edit-btn" onclick="renderHwList(${item.id})">Edit</button>
+        <button class="del-btn" onclick="deleteHardwareType(${item.id})">Delete</button>
+      </div>
+    </li>`;
+  }).join('');
+}
+
+async function addHardwareType() {
+  const input = document.getElementById('hwNameInput');
+  const name = input.value.trim();
+  const msg = document.getElementById('hwMsg');
+  if (!name) { msg.textContent = 'Please enter a name.'; return; }
+  const res = await fetch('/api/hardware-types', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name })
+  });
+  if (res.ok) {
+    msg.textContent = 'Added successfully!';
+    input.value = '';
+    await loadHwList();
+    await populateHwDropdowns();
+  } else {
+    msg.textContent = 'Error adding data.';
+  }
+}
+
+async function saveHwEdit(id) {
+  const name = document.getElementById(`hwEditName-${id}`).value.trim();
+  if (!name) { alert('Name cannot be empty.'); return; }
+  const res = await fetch(`/api/hardware-types/${id}`, {
+    method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name })
+  });
+  if (res.ok) {
+    await loadHwList();
+    await populateHwDropdowns();
+    loadCatList();
+    loadModelList();
+  } else {
+    alert('Error updating data.');
+  }
+}
+
+async function deleteHardwareType(id) {
+  if (!confirm('Delete this item?')) return;
+  await fetch(`/api/hardware-types/${id}`, { method: 'DELETE' });
+  await loadHwList();
+  await populateHwDropdowns();
+}
+
+// ===== CATEGORIES =====
+let catData = [];
+async function loadCatList() {
+  const res = await fetch('/api/categories');
+  catData = await res.json();
+  renderCatList();
+}
+
+function renderCatList(editingId) {
+  document.getElementById('catList').innerHTML = catData.map(item => {
+    if (item.id === editingId) {
+      return `<li>
+        <div class="edit-row">
+          <select id="catEditHw-${item.id}">${hwOptionsHtml(item.hardware_type_id)}</select>
+          <input type="text" id="catEditName-${item.id}" value="${item.name}">
+        </div>
+        <div class="item-actions">
+          <button class="save-btn" onclick="saveCatEdit(${item.id})">Save</button>
+          <button class="cancel-btn" onclick="renderCatList()">Cancel</button>
+        </div>
+      </li>`;
+    }
+    return `<li>
+      <div class="li-left"><span class="tag">${item.hardware_type_name}</span><span>${item.name}</span></div>
+      <div class="item-actions">
+        <button class="edit-btn" onclick="renderCatList(${item.id})">Edit</button>
+        <button class="del-btn" onclick="deleteCategory(${item.id})">Delete</button>
+      </div>
+    </li>`;
+  }).join('');
+}
+
+async function addCategory() {
+  const hwSelect = document.getElementById('catHwSelect');
+  const input = document.getElementById('catNameInput');
+  const name = input.value.trim();
+  const hardware_type_id = hwSelect.value;
+  const msg = document.getElementById('catMsg');
+  if (!hardware_type_id) { msg.textContent = 'Please select a Hardware Type first.'; return; }
+  if (!name) { msg.textContent = 'Please enter a name.'; return; }
+  const res = await fetch('/api/categories', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, hardware_type_id })
+  });
+  if (res.ok) {
+    msg.textContent = 'Added successfully!';
+    input.value = '';
+    loadCatList();
+  } else {
+    msg.textContent = 'Error adding data.';
+  }
+}
+
+async function saveCatEdit(id) {
+  const name = document.getElementById(`catEditName-${id}`).value.trim();
+  const hardware_type_id = document.getElementById(`catEditHw-${id}`).value;
+  if (!name) { alert('Name cannot be empty.'); return; }
+  const res = await fetch(`/api/categories/${id}`, {
+    method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, hardware_type_id })
+  });
+  if (res.ok) {
+    loadCatList();
+  } else {
+    alert('Error updating data.');
+  }
+}
+
+async function deleteCategory(id) {
+  if (!confirm('Delete this item?')) return;
+  await fetch(`/api/categories/${id}`, { method: 'DELETE' });
+  loadCatList();
+}
+
+// ===== STATUSES =====
+let statusData = [];
+async function loadStatusList() {
+  const res = await fetch('/api/statuses');
+  statusData = await res.json();
+  renderStatusList();
+}
+
+function renderStatusList(editingId) {
+  document.getElementById('statusList').innerHTML = statusData.map(item => {
+    if (item.id === editingId) {
+      return `<li>
+        <div class="edit-row">
+          <input type="color" id="statusEditColor-${item.id}" value="${item.color_hex}">
+          <input type="text" id="statusEditName-${item.id}" value="${item.name}">
+        </div>
+        <div class="item-actions">
+          <button class="save-btn" onclick="saveStatusEdit(${item.id})">Save</button>
+          <button class="cancel-btn" onclick="renderStatusList()">Cancel</button>
+        </div>
+      </li>`;
+    }
+    return `<li>
+      <div class="li-left-row"><span class="swatch" style="background:${item.color_hex}"></span><span>${item.name}</span></div>
+      <div class="item-actions">
+        <button class="edit-btn" onclick="renderStatusList(${item.id})">Edit</button>
+        <button class="del-btn" onclick="deleteStatus(${item.id})">Delete</button>
+      </div>
+    </li>`;
+  }).join('');
+}
+
+async function addStatus() {
+  const colorInput = document.getElementById('statusColorInput');
+  const input = document.getElementById('statusNameInput');
+  const name = input.value.trim();
+  const color_hex = colorInput.value;
+  const msg = document.getElementById('statusMsg');
+  if (!name) { msg.textContent = 'Please enter a name.'; return; }
+  const res = await fetch('/api/statuses', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, color_hex })
+  });
+  if (res.ok) {
+    msg.textContent = 'Added successfully!';
+    input.value = '';
+    loadStatusList();
+  } else {
+    msg.textContent = 'Error adding data.';
+  }
+}
+
+async function saveStatusEdit(id) {
+  const name = document.getElementById(`statusEditName-${id}`).value.trim();
+  const color_hex = document.getElementById(`statusEditColor-${id}`).value;
+  if (!name) { alert('Name cannot be empty.'); return; }
+  const res = await fetch(`/api/statuses/${id}`, {
+    method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, color_hex })
+  });
+  if (res.ok) {
+    loadStatusList();
+  } else {
+    alert('Error updating data.');
+  }
+}
+
+async function deleteStatus(id) {
+  if (!confirm('Delete this item?')) return;
+  await fetch(`/api/statuses/${id}`, { method: 'DELETE' });
+  loadStatusList();
+}
+
+// ===== MODELS =====
+let modelData = [];
+async function loadModelList() {
+  const res = await fetch('/api/models');
+  modelData = await res.json();
+  renderModelList();
+}
+
+function renderModelList(editingId) {
+  document.getElementById('modelList').innerHTML = modelData.map(item => {
+    if (item.id === editingId) {
+      return `<li>
+        <div class="edit-row">
+          <select id="modelEditHw-${item.id}">${hwOptionsHtml(item.hardware_type_id)}</select>
+          <input type="text" id="modelEditName-${item.id}" value="${item.name}">
+        </div>
+        <div class="item-actions">
+          <button class="save-btn" onclick="saveModelEdit(${item.id})">Save</button>
+          <button class="cancel-btn" onclick="renderModelList()">Cancel</button>
+        </div>
+      </li>`;
+    }
+    return `<li>
+      <div class="li-left"><span class="tag">${item.hardware_type_name}</span><span>${item.name}</span></div>
+      <div class="item-actions">
+        <button class="edit-btn" onclick="renderModelList(${item.id})">Edit</button>
+        <button class="del-btn" onclick="deleteModel(${item.id})">Delete</button>
+      </div>
+    </li>`;
+  }).join('');
+}
+
+async function addModel() {
+  const hwSelect = document.getElementById('modelHwSelect');
+  const input = document.getElementById('modelNameInput');
+  const name = input.value.trim();
+  const hardware_type_id = hwSelect.value;
+  const msg = document.getElementById('modelMsg');
+  if (!hardware_type_id) { msg.textContent = 'Please select a Hardware Type first.'; return; }
+  if (!name) { msg.textContent = 'Please enter a name.'; return; }
+  const res = await fetch('/api/models', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, hardware_type_id })
+  });
+  if (res.ok) {
+    msg.textContent = 'Added successfully!';
+    input.value = '';
+    loadModelList();
+  } else {
+    msg.textContent = 'Error adding data.';
+  }
+}
+
+async function saveModelEdit(id) {
+  const name = document.getElementById(`modelEditName-${id}`).value.trim();
+  const hardware_type_id = document.getElementById(`modelEditHw-${id}`).value;
+  if (!name) { alert('Name cannot be empty.'); return; }
+  const res = await fetch(`/api/models/${id}`, {
+    method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, hardware_type_id })
+  });
+  if (res.ok) {
+    loadModelList();
+  } else {
+    alert('Error updating data.');
+  }
+}
+
+async function deleteModel(id) {
+  if (!confirm('Delete this item?')) return;
+  await fetch(`/api/models/${id}`, { method: 'DELETE' });
+  loadModelList();
+}
+
+// ===== SHARED =====
+async function populateHwDropdowns() {
+  const res = await fetch('/api/hardware-types');
+  allHwTypes = await res.json();
+  ['catHwSelect', 'modelHwSelect'].forEach(id => {
+    const select = document.getElementById(id);
+    const current = select.value;
+    select.innerHTML = '<option value="">-- Select Hardware Type --</option>' + hwOptionsHtml();
+    select.value = current;
+  });
+}
+
+async function initAll() {
+  await loadHwList();
+  await populateHwDropdowns();
+  loadCatList();
+  loadStatusList();
+  loadModelList();
+}
+initAll();
+</script>
+</body>
+</html>

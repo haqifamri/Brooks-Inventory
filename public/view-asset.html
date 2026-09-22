@@ -1,0 +1,137 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>View Asset</title>
+<script src="/sidebar.js"></script>
+<style>
+  body { font-family: Arial, sans-serif; background: #f2f6fb; color: #1f2937; }
+  h1 { color: #1a4f8a; margin-top: 0; display: flex; align-items: center; gap: 12px; }
+  .top-actions { display: flex; gap: 8px; margin-bottom: 20px; }
+  .btn { padding: 8px 16px; border-radius: 6px; font-size: 13px; text-decoration: none; border: none; cursor: pointer; }
+  .btn-edit { background: #2d6cdf; color: white; }
+  .btn-edit:hover { background: #3d7ce4; }
+  .btn-back { background: #edf3fb; color: #1f2937; border: 1px solid #dfe7f0; }
+  .btn-back:hover { background: #e2ebf8; }
+  .status-badge { display: inline-flex; align-items: center; gap: 6px; padding: 4px 12px; border-radius: 20px; font-size: 13px; font-weight: bold; }
+  .status-dot { width: 8px; height: 8px; border-radius: 50%; }
+  .card { background: #ffffff; border-radius: 8px; padding: 20px 24px; margin-bottom: 16px; max-width: 800px; border: 1px solid #dfe7f0; box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04); }
+  .card h2 { color: #1a4f8a; font-size: 14px; text-transform: uppercase; letter-spacing: 0.5px; margin: 0 0 14px; border-bottom: 1px solid #dfe7f0; padding-bottom: 8px; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px 24px; }
+  .item label { display: block; font-size: 11px; color: #5d6b7a; text-transform: uppercase; margin-bottom: 3px; }
+  .item span { font-size: 15px; }
+  .remark-box { font-size: 14px; white-space: pre-wrap; }
+  #loading { color: #5d6b7a; }
+</style>
+</head>
+<body>
+  <div id="loading">Loading...</div>
+  <div id="content" style="display:none">
+    <h1 id="titleServiceTag"></h1>
+    <div class="top-actions">
+      <a class="btn btn-edit" id="editLink">Edit Asset</a>
+      <a class="btn btn-back" href="/assets.html">&larr; Back to list</a>
+    </div>
+
+    <div class="card">
+      <h2>Identification</h2>
+      <div class="grid">
+        <div class="item"><label>Service Tag (ST)</label><span id="f_service_tag"></span></div>
+        <div class="item"><label>Serial Number (S/N)</label><span id="f_serial_number"></span></div>
+        <div class="item"><label>Host Name</label><span id="f_host_name"></span></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Classification</h2>
+      <div class="grid">
+        <div class="item"><label>Hardware Type</label><span id="f_hardware_type_name"></span></div>
+        <div class="item"><label>Model</label><span id="f_model_name"></span></div>
+        <div class="item"><label>Category</label><span id="f_category_name"></span></div>
+        <div class="item"><label>Status</label><span id="f_status"></span></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Dates</h2>
+      <div class="grid">
+        <div class="item"><label>Date Received/GR</label><span id="f_date_received"></span></div>
+        <div class="item"><label>Start Date/Date Deploy</label><span id="f_start_date"></span></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Assignment</h2>
+      <div class="grid">
+        <div class="item"><label>Asset Owner</label><span id="f_asset_owner"></span></div>
+        <div class="item"><label>Login ID</label><span id="f_login_id"></span></div>
+        <div class="item"><label>Email</label><span id="f_email"></span></div>
+        <div class="item"><label>Location</label><span id="f_location"></span></div>
+        <div class="item"><label>Teamviewer ID</label><span id="f_teamviewer_id"></span></div>
+        <div class="item"><label>Box No.</label><span id="f_box_no"></span></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Other</h2>
+      <div class="item">
+        <label>Remark</label>
+        <div class="remark-box" id="f_remark"></div>
+      </div>
+    </div>
+  </div>
+
+<script>
+const assetId = new URLSearchParams(window.location.search).get('id');
+
+function fmtDate(dateStr) {
+  if (!dateStr) return '-';
+  return dateStr.split('T')[0];
+}
+
+function setText(id, value) {
+  document.getElementById(id).textContent = value || '-';
+}
+
+async function loadAsset() {
+  if (!assetId) {
+    document.getElementById('loading').textContent = 'No asset ID provided.';
+    return;
+  }
+  const res = await fetch(`/api/assets/${assetId}`);
+  if (!res.ok) {
+    document.getElementById('loading').textContent = 'Asset not found.';
+    return;
+  }
+  const a = await res.json();
+
+  document.getElementById('titleServiceTag').textContent = a.service_tag || a.serial_number;
+  document.getElementById('editLink').href = `/edit-asset.html?id=${a.id}`;
+
+  setText('f_service_tag', a.service_tag);
+  setText('f_serial_number', a.serial_number);
+  setText('f_host_name', a.host_name);
+  setText('f_hardware_type_name', a.hardware_type_name);
+  setText('f_model_name', a.model_name);
+  setText('f_category_name', a.category_name);
+  setText('f_date_received', fmtDate(a.date_received));
+  setText('f_start_date', fmtDate(a.start_date));
+  setText('f_asset_owner', a.asset_owner);
+  setText('f_login_id', a.login_id);
+  setText('f_email', a.email);
+  setText('f_location', a.location);
+  setText('f_teamviewer_id', a.teamviewer_id);
+  setText('f_box_no', a.box_no);
+  setText('f_remark', a.remark);
+
+  const statusColor = a.status_color || '#888';
+  document.getElementById('f_status').innerHTML = `<span class="status-badge" style="background:${statusColor}22; color:${statusColor}"><span class="status-dot" style="background:${statusColor}"></span>${a.status_name}</span>`;
+
+  document.getElementById('loading').style.display = 'none';
+  document.getElementById('content').style.display = 'block';
+}
+
+loadAsset();
+</script>
+</body>
+</html>

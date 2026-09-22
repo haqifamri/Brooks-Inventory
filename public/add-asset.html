@@ -1,0 +1,223 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Add New Asset</title>
+<script src="/sidebar.js"></script>
+<style>
+  :root {
+    --brooks-bg: #f3f6fb;
+    --brooks-bg-2: #edf3fb;
+    --brooks-panel: #ffffff;
+    --brooks-card: #ffffff;
+    --brooks-border: #dfe7f0;
+    --brooks-text: #1f2937;
+    --brooks-muted: #5d6b7a;
+    --brooks-accent: #2d6cdf;
+    --brooks-accent-2: #1a4f8a;
+    --brooks-button: linear-gradient(135deg, #4e96ff 0%, #2d6cdf 100%);
+    --brooks-button-hover: linear-gradient(135deg, #64a9ff 0%, #3679eb 100%);
+  }
+
+  body { font-family: Arial, sans-serif; background: linear-gradient(180deg, var(--brooks-bg) 0%, var(--brooks-bg-2) 100%); color: var(--brooks-text); }
+  h1 { color: var(--brooks-accent-2); margin-top: 0; }
+  .top-actions { margin-bottom: 16px; }
+  .btn-back { background: #edf3fb; color: var(--brooks-text); padding: 8px 16px; border-radius: 6px; font-size: 13px; text-decoration: none; border: 1px solid var(--brooks-border); cursor: pointer; }
+  .btn-back:hover { background: #e2ebf8; }
+  .form-box { background: #ffffff; padding: 24px; border-radius: 10px; max-width: 700px; border: 1px solid var(--brooks-border); box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04); }
+  .row { display: flex; gap: 12px; margin-bottom: 14px; }
+  .field { flex: 1; display: flex; flex-direction: column; }
+  label { font-size: 12px; color: var(--brooks-muted); margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.3px; }
+  input, select, textarea { padding: 9px; border-radius: 6px; border: 1px solid var(--brooks-border); background: #ffffff; color: var(--brooks-text); font-family: inherit; font-size: 14px; }
+  textarea { resize: vertical; min-height: 60px; }
+  .required { color: #c1543a; }
+  .hint { font-size: 12px; color: var(--brooks-muted); margin: -6px 0 12px; }
+  button.submit-btn { padding: 12px 20px; background: var(--brooks-button); color: #ffffff; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 14px; margin-top: 10px; box-shadow: 0 8px 18px rgba(45, 108, 223, 0.18); }
+  button.submit-btn:hover { background: var(--brooks-button-hover); }
+  #msg { margin-top: 12px; font-size: 14px; }
+  .msg-success { color: #1f8f5f; }
+  .msg-error { color: #c1543a; }
+  fieldset { border: 1px solid var(--brooks-border); border-radius: 8px; margin-bottom: 16px; padding: 14px; background: #f8fbff; }
+  legend { color: var(--brooks-accent-2); font-size: 13px; padding: 0 8px; }
+</style>
+</head>
+<body>
+  <div class="top-actions">
+    <a class="btn-back" href="/assets.html">&larr; Back to Assets List</a>
+  </div>
+  <h1>Add New Asset</h1>
+
+  <div class="form-box">
+    <fieldset>
+      <legend>Identification</legend>
+      <div class="hint">Fill in Service Tag (ST) or Serial Number (S/N) &mdash; at least one is required.</div>
+      <div class="row">
+        <div class="field"><label>Service Tag (ST)</label><input type="text" id="service_tag"></div>
+        <div class="field"><label>Serial Number (S/N)</label><input type="text" id="serial_number"></div>
+      </div>
+      <div class="row">
+        <div class="field"><label>Host Name</label><input type="text" id="host_name"></div>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Classification</legend>
+      <div class="row">
+        <div class="field"><label>Hardware Type <span class="required">*</span></label><select id="hardware_type_id"></select></div>
+        <div class="field"><label>Model</label><input type="text" id="model_name" list="modelOptions" placeholder="Type or pick existing"><datalist id="modelOptions"></datalist></div>
+      </div>
+      <div class="row">
+        <div class="field"><label>Category <span class="required">*</span></label><select id="category_id"></select></div>
+        <div class="field"><label>Status <span class="required">*</span></label><select id="status_id"></select></div>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Dates</legend>
+      <div class="row">
+        <div class="field"><label>Date Received/GR</label><input type="date" id="date_received"></div>
+        <div class="field"><label>Start Date/Date Deploy</label><input type="date" id="start_date"></div>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Assignment</legend>
+      <div class="row">
+        <div class="field"><label>Asset Owner</label><input type="text" id="asset_owner"></div>
+        <div class="field"><label>Login ID</label><input type="text" id="login_id"></div>
+      </div>
+      <div class="row">
+        <div class="field"><label>Email</label><input type="email" id="email"></div>
+        <div class="field"><label>Location</label><input type="text" id="location"></div>
+      </div>
+      <div class="row">
+        <div class="field"><label>Teamviewer ID</label><input type="text" id="teamviewer_id"></div>
+        <div class="field"><label>Box No.</label><input type="text" id="box_no"></div>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Other</legend>
+      <div class="row">
+        <div class="field"><label>Remark</label><textarea id="remark"></textarea></div>
+      </div>
+    </fieldset>
+
+    <button class="submit-btn" onclick="saveAsset()">Save Asset</button>
+    <div id="msg"></div>
+  </div>
+
+<script>
+let allCategories = [];
+let allModels = [];
+
+async function loadDropdowns() {
+  const hwRes = await fetch('/api/hardware-types');
+  const hwData = await hwRes.json();
+  const hwSelect = document.getElementById('hardware_type_id');
+  hwSelect.innerHTML = '<option value="">-- Select --</option>';
+  hwData.forEach(item => {
+    const opt = document.createElement('option');
+    opt.value = item.id;
+    opt.textContent = item.name;
+    hwSelect.appendChild(opt);
+  });
+
+  const catRes = await fetch('/api/categories');
+  allCategories = await catRes.json();
+
+  const modelRes = await fetch('/api/models');
+  allModels = await modelRes.json();
+
+  const statusRes = await fetch('/api/statuses');
+  const statusData = await statusRes.json();
+  const statusSelect = document.getElementById('status_id');
+  statusSelect.innerHTML = '<option value="">-- Select --</option>';
+  statusData.forEach(item => {
+    const opt = document.createElement('option');
+    opt.value = item.id;
+    opt.textContent = item.name;
+    statusSelect.appendChild(opt);
+  });
+
+  hwSelect.addEventListener('change', filterByHardwareType);
+}
+
+function filterByHardwareType() {
+  const hwId = document.getElementById('hardware_type_id').value;
+  const catSelect = document.getElementById('category_id');
+  catSelect.innerHTML = '<option value="">-- Select --</option>';
+  allCategories.filter(c => String(c.hardware_type_id) === String(hwId)).forEach(c => {
+    const opt = document.createElement('option');
+    opt.value = c.id;
+    opt.textContent = c.name;
+    catSelect.appendChild(opt);
+  });
+  const modelList = document.getElementById('modelOptions');
+  modelList.innerHTML = '';
+  allModels.filter(m => String(m.hardware_type_id) === String(hwId)).forEach(m => {
+    const opt = document.createElement('option');
+    opt.value = m.name;
+    modelList.appendChild(opt);
+  });
+}
+
+async function saveAsset() {
+  const msg = document.getElementById('msg');
+  const service_tag = document.getElementById('service_tag').value.trim();
+  const serial_number = document.getElementById('serial_number').value.trim();
+  const hardware_type_id = document.getElementById('hardware_type_id').value;
+  const category_id = document.getElementById('category_id').value;
+  const status_id = document.getElementById('status_id').value;
+
+  if (!service_tag && !serial_number) {
+    msg.className = 'msg-error';
+    msg.textContent = 'Please fill Service Tag or Serial Number (at least one).';
+    return;
+  }
+  if (!hardware_type_id || !category_id || !status_id) {
+    msg.className = 'msg-error';
+    msg.textContent = 'Please fill Hardware Type, Category, and Status.';
+    return;
+  }
+
+  const payload = {
+    service_tag,
+    serial_number,
+    host_name: document.getElementById('host_name').value.trim(),
+    hardware_type_id,
+    model_name: document.getElementById('model_name').value.trim(),
+    category_id,
+    status_id,
+    teamviewer_id: document.getElementById('teamviewer_id').value.trim(),
+    date_received: document.getElementById('date_received').value,
+    start_date: document.getElementById('start_date').value,
+    asset_owner: document.getElementById('asset_owner').value.trim(),
+    box_no: document.getElementById('box_no').value.trim(),
+    login_id: document.getElementById('login_id').value.trim(),
+    email: document.getElementById('email').value.trim(),
+    location: document.getElementById('location').value.trim(),
+    remark: document.getElementById('remark').value.trim()
+  };
+
+  const res = await fetch('/api/assets', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  });
+
+  const data = await res.json();
+  if (res.ok) {
+    msg.className = 'msg-success';
+    msg.textContent = 'Asset saved successfully! Redirecting...';
+    setTimeout(() => { window.location.href = '/assets.html'; }, 900);
+  } else {
+    msg.className = 'msg-error';
+    msg.textContent = data.error || 'Error saving asset.';
+  }
+}
+
+loadDropdowns();
+</script>
+</body>
+</html>

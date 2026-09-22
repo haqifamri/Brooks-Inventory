@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Bulk Edit Assets</title>
+<script src="/sidebar.js"></script>
+<style>
+  :root {
+    --page-bg: #f3f6fb;
+    --card-bg: #ffffff;
+    --card-alt: #f8fafc;
+    --border: #dfe7f0;
+    --text: #1f2937;
+    --muted: #5f6f82;
+    --heading: #1d4b8f;
+    --button-blue: linear-gradient(135deg, #4e96ff 0%, #2d6cdf 100%);
+    --button-blue-hover: linear-gradient(135deg, #64a9ff 0%, #3679eb 100%);
+    --danger: #c1543a;
+  }
+
+  body { font-family: Arial, sans-serif; background: var(--page-bg); color: var(--text); }
+  h1 { color: var(--heading); margin-top: 0; }
+  .box { background: var(--card-bg); padding: 20px; border-radius: 8px; margin-bottom: 16px; border: 1px solid var(--border); box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04); }
+  .row { display: flex; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; }
+  .field { flex: 1; min-width: 180px; display: flex; flex-direction: column; }
+  .same-option { display: flex; align-items: center; justify-content: flex-start; align-self: flex-start; width: 100%; gap: 6px; margin-top: 5px; font-size: 11px; color: var(--muted); text-transform: uppercase; }
+  .same-option input[type="checkbox"] { flex: 0 0 auto; width: 13px; height: 13px; padding: 0; margin: 0; }
+  label { font-size: 11px; color: var(--muted); text-transform: uppercase; margin-bottom: 4px; }
+  input, select, textarea { padding: 9px; border-radius: 6px; border: 1px solid var(--border); background: #ffffff; color: var(--text); font: inherit; }
+  table { width: 100%; border-collapse: collapse; min-width: 620px; }
+  th, td { padding: 8px; border-bottom: 1px solid var(--border); text-align: left; }
+  th { color: var(--heading); font-size: 12px; }
+  .table-wrap { overflow-x: auto; }
+  button { padding: 9px 14px; border: 0; border-radius: 6px; font-weight: bold; cursor: pointer; }
+  .primary { background: var(--button-blue); color: #ffffff; }
+  .primary:hover { background: var(--button-blue-hover); }
+  .secondary { background: #e7edf7; color: var(--text); border: 1px solid var(--border); }
+  .secondary:hover { background: #dfeaf8; }
+  .danger { background: var(--danger); color: white; }
+  #msg { margin-top: 12px; white-space: pre-wrap; color: var(--text); }
+</style>
+</head>
+<body>
+  <h1>Bulk Edit Assets</h1>
+  <div class="box">
+    <div class="row">
+      <div class="field"><label>Hardware Type *</label><select id="hardware_type_id"></select></div>
+      <div class="field"><label>Model</label><input id="model_name" list="modelOptions"><datalist id="modelOptions"></datalist></div>
+      <div class="field"><label>Category *</label><select id="category_id"></select></div>
+      <div class="field"><label>Status *</label><select id="status_id"></select></div>
+    </div>
+    <div class="row">
+      <div class="field"><label>Date Received / GR</label><input type="date" id="date_received"></div>
+      <div class="field"><label>Start Date / Deploy</label><input type="date" id="start_date"></div>
+      <div class="field"><label>Asset Owner</label><input id="asset_owner"><label class="same-option"><input type="checkbox" id="same_asset_owner" checked>Asset Owner - Same for all</label></div>
+      <div class="field"><label>Location</label><input id="location"><label class="same-option"><input type="checkbox" id="same_location" checked>Location - Same for all</label></div>
+    </div>
+    <div class="row">
+      <div class="field"><label>Login ID</label><input id="login_id"><label class="same-option"><input type="checkbox" id="same_login_id" checked>Login ID - Same for all</label></div>
+      <div class="field"><label>Email</label><input type="email" id="email"><label class="same-option"><input type="checkbox" id="same_email" checked>Email - Same for all</label></div>
+      <div class="field"><label>TeamViewer ID</label><input id="teamviewer_id"><label class="same-option"><input type="checkbox" id="same_teamviewer_id" checked>TeamViewer ID - Same for all</label></div>
+      <div class="field"><label>Box No.</label><input id="box_no"><label class="same-option"><input type="checkbox" id="same_box_no" checked>Box No. - Same for all</label></div>
+    </div>
+    <div class="field"><label>Remark</label><textarea id="remark"></textarea><label class="same-option"><input type="checkbox" id="same_remark" checked>Remark - Same for all</label></div>
+  </div>
+
+  <div class="box">
+    <a class="secondary" href="/assets.html">Back to Assets</a>
+    <div class="table-wrap">
+      <table>
+        <thead id="assetHeader"></thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </div>
+    <br> </br>
+    <button class="primary" onclick="previewBulkEdit()">Preview Changes</button>
+      <button class="danger" onclick="deleteSelectedAssets()">Delete Selected</button>
+    <div id="msg"></div>
+  </div>
+<script>
+let categories = [], models = [];
+let selectedAssets = [];
+const selectedAssetIds = new URLSearchParams(window.location.search)
+  .get('ids')
+  ?.split(',')
+  .filter(Boolean)
+  .map(Number) || [];
+
+const optionalColumns = [
+  { key: 'asset_owner', checkbox: 'same_asset_owner', label: 'Asset Owner' },
+  { key: 'location', checkbox: 'same_location', label: 'Location' },
+  { key: 'login_id', checkbox: 'same_login_id', label: 'Login ID' },
+  { key: 'email', checkbox: 'same_email', label: 'Email' },
+  { key: 'teamviewer_id', checkbox: 'same_teamviewer_id', label: 'TeamViewer ID' },
+  { key: 'box_no', checkbox: 'same_box_no', label: 'Box No.' },
+  { key: 'remark', checkbox: 'same_remark', label: 'Remark' }
+];
+
+function renderRows() {
+  const body = document.getElementById('rows');
+  const existingValues = new Map(
+    [...body.querySelectorAll('tr')].map(row => {
+      const values = {};
+      row.querySelectorAll('[data-field]').forEach(input => {
+        values[input.dataset.field] = input.value;
+      });
+      return [Number(row.dataset.assetId), values];
+    })
+  );
+  body.innerHTML = '';
+
+  selectedAssets.forEach(asset => {
+    const row = body.insertRow();
+    const previousValues = existingValues.get(Number(asset.id)) || {};
+
+    const optionalInputs = getVisibleOptionalColumns()
+      .map(column => {
+        const inputValue = Object.prototype.hasOwnProperty.call(previousValues, column.key)
+          ? previousValues[column.key]
+          : (document.getElementById(column.checkbox).checked
+            ? value(column.key)
+            : (asset[column.key] || ''));
+
+        return `
+        <td>
+          <input data-field="${column.key}" value="${inputValue}">
+        </td>
+      `;
+      })
+      .join('');
+
+    row.innerHTML = `
+      <td>${body.rows.length}</td>
+      <td>${asset.service_tag || '-'}</td>
+      <td>${asset.serial_number || '-'}</td>
+      <td>${asset.host_name || '-'}</td>
+      ${optionalInputs}
+    `;
+
+    row.dataset.assetId = asset.id;
+  });
+}
+function getVisibleOptionalColumns() {
+  return optionalColumns.filter(column =>
+    !document.getElementById(column.checkbox).checked
+  );
+}
+const value = id => document.getElementById(id).value.trim();
+
+async function loadSelectedAssets() {
+  const msg = document.getElementById('msg');
+
+  if (!selectedAssetIds.length) {
+    msg.textContent = 'No assets selected.';
+    return;
+  }
+
+  const res = await fetch('/api/assets');
+
+  if (!res.ok) {
+    msg.textContent = 'Unable to load assets.';
+    return;
+  }
+
+  const assets = await res.json();
+
+  selectedAssets = assets.filter(asset =>
+    selectedAssetIds.includes(Number(asset.id))
+  );
+
+  if (!selectedAssets.length) {
+    msg.textContent = 'Selected assets were not found.';
+    return;
+  }
+
+  document.getElementById('rows').innerHTML = '';
+
+  selectedAssets.forEach(asset => {
+    addEditRow(asset);
+  });
+}
+
+function previewBulkEdit() {
+  const rows = [...document.querySelectorAll('#rows tr')];
+  const msg = document.getElementById('msg');
+
+  if (!rows.length) {
+    msg.textContent = 'No assets selected.';
+    return;
+  }
+
+  const sharedUpdates = {};
+
+  optionalColumns.forEach(column => {
+    const checkbox = document.getElementById(column.checkbox);
+    const input = document.getElementById(column.key);
+
+    if (checkbox.checked && input.value.trim() !== '') {
+      sharedUpdates[column.key] = input.value.trim();
+    }
+  });
+
+  const statusId = value('status_id');
+  if (statusId) {
+    sharedUpdates.status_id = statusId;
+  }
+
+  const updates = rows.map(row => {
+    const values = { ...sharedUpdates };
+
+    row.querySelectorAll('[data-field]').forEach(input => {
+      if (input.value.trim() !== '') {
+        values[input.dataset.field] = input.value.trim();
+      }
+    });
+
+    return {
+      id: Number(row.dataset.assetId),
+      values
+    };
+  });
+
+  const preview = updates.map(item => {
+    const changedFields = Object.entries(item.values)
+      .map(([field, value]) => `${field}: ${value}`)
+      .join(', ');
+
+    return `Asset ID ${item.id}: ${changedFields || 'No changes'}`;
+  }).join('\n');
+
+  msg.innerHTML = `
+    <pre>Preview changes:
+${preview}</pre>
+    <button id="confirmBulkEdit" class="primary">Confirm & Apply</button>
+  `;
+
+  document.getElementById('confirmBulkEdit').onclick = () => {
+    applyBulkEdit(updates);
+  };
+}
+
+async function applyBulkEdit(updates) {
+  const fields = {};
+
+  updates.forEach(item => {
+    Object.assign(fields, item.values);
+  });
+
+  const res = await fetch('/api/assets/bulk-update', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      ids: updates.map(item => item.id),
+      updates: fields
+    })
+  });
+
+  const data = await res.json();
+
+  if (!res.ok) {
+    document.getElementById('msg').textContent =
+      data.error || 'Bulk edit failed.';
+    return;
+  }
+
+  document.getElementById('msg').textContent =
+    `${data.affected} asset(s) updated successfully.`;
+}
+
+async function deleteSelectedAssets() {
+  if (!selectedAssetIds.length) {
+    document.getElementById('msg').textContent = 'No assets selected.';
+    return;
+  }
+
+  const confirmed = confirm(
+    `Delete ${selectedAssetIds.length} selected asset(s)? This cannot be undone.`
+  );
+  if (!confirmed) return;
+
+  try {
+    const responses = await Promise.all(
+      selectedAssetIds.map(id => fetch(`/api/assets/${id}`, { method: 'DELETE' }))
+    );
+
+    if (responses.some(response => !response.ok)) {
+      throw new Error('One or more assets could not be deleted.');
+    }
+  } catch (error) {
+    document.getElementById('msg').textContent =
+      error.message || 'Delete failed.';
+    return;
+  }
+
+  window.location.href = '/assets.html';
+}
+
+async function init() {
+  const [hwRes, catRes, modelRes, statusRes] = await Promise.all([
+    fetch('/api/hardware-types'), fetch('/api/categories'), fetch('/api/models'), fetch('/api/statuses')
+  ]);
+  const hw = await hwRes.json(); categories = await catRes.json(); models = await modelRes.json();
+  const statuses = await statusRes.json();
+  fill('hardware_type_id', hw, '-- Select --');
+  fill('status_id', statuses, '-- Select --');
+  document.getElementById('hardware_type_id').addEventListener('change', filterOptions);
+  document.querySelectorAll('[id^="same_"]').forEach(checkbox => {
+    checkbox.addEventListener('change', () => {
+      renderHeader();
+      renderRows();
+    });
+  });
+  renderHeader();
+  loadSelectedAssets();
+}
+function fill(id, items, first) {
+  document.getElementById(id).innerHTML = `<option value="">${first}</option>` +
+    items.map(x => `<option value="${x.id}">${x.name}</option>`).join('');
+}
+function filterOptions() {
+  const hw = document.getElementById('hardware_type_id').value;
+  fill('category_id', categories.filter(x => String(x.hardware_type_id) === String(hw)), '-- Select --');
+  document.getElementById('modelOptions').innerHTML = models
+    .filter(x => String(x.hardware_type_id) === String(hw))
+    .map(x => `<option value="${x.name}">`).join('');
+}
+function renderHeader() {
+  const header = document.getElementById('assetHeader');
+  const optionalHeaders = getVisibleOptionalColumns()
+    .map(column => `<th>${column.label}</th>`)
+    .join('');
+
+  header.innerHTML = `
+    <tr>
+      <th>#</th>
+      <th>Service Tag</th>
+      <th>Serial Number</th>
+      <th>Host Name</th>
+      ${optionalHeaders}
+      <th></th>
+    </tr>
+  `;
+}
+
+function addRow() {
+  const body = document.getElementById('rows');
+  const row = body.insertRow();
+
+  const optionalInputs = getVisibleOptionalColumns()
+    .map(column =>
+      `<td><input data-field="${column.key}"></td>`
+    )
+    .join('');
+
+  row.innerHTML = `
+    <td>${body.rows.length}</td>
+    <td><input data-field="service_tag"></td>
+    <td><input data-field="serial_number"></td>
+    <td><input data-field="host_name"></td>
+    ${optionalInputs}
+    <td>
+      <button class="danger" onclick="this.closest('tr').remove()">
+        Remove
+      </button>
+    </td>
+  `;
+}
+function addEditRow(asset) {
+  const body = document.getElementById('rows');
+  const row = body.insertRow();
+
+  const optionalInputs = getVisibleOptionalColumns()
+    .map(column => `
+      <td>
+        <input data-field="${column.key}" value="${asset[column.key] || ''}">
+      </td>
+    `)
+    .join('');
+
+  row.innerHTML = `
+    <td>${body.rows.length}</td>
+    <td>${asset.service_tag || '-'}</td>
+    <td>${asset.serial_number || '-'}</td>
+    <td>${asset.host_name || '-'}</td>
+    ${optionalInputs}
+  `;
+
+  row.dataset.assetId = asset.id;
+}
+async function saveBulk() {
+  const msg = document.getElementById('msg');
+  const shared = {
+    hardware_type_id: value('hardware_type_id'), 
+    model_name: value('model_name'),
+    category_id: value('category_id'), 
+    status_id: value('status_id'),
+    date_received: value('date_received'), 
+    start_date: value('start_date'),
+  };
+  optionalColumns.forEach(column => {
+    shared[column.key] = value(column.key);
+  });
+  const rows = [...document.querySelectorAll('#rows tr')].map(tr => {
+    const result = {};
+    tr.querySelectorAll('[data-field]').forEach(input => result[input.dataset.field] = input.value.trim());
+    return result;
+  });
+  if (!shared.hardware_type_id || !shared.category_id || !shared.status_id || !rows.length) {
+    msg.textContent = 'Hardware Type, Category, Status and addd at least one row.';
+    return;
+  }
+  const res = await fetch('/api/assets/bulk', {
+    method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ shared, rows })
+  });
+  const data = await res.json();
+  msg.textContent = res.ok
+    ? `Successfully saved: ${data.savedCount}.` + (data.errors.length ? `\nRalat:\n${data.errors.map(x => `Baris ${x.row}: ${x.error}`).join('\n')}` : '')
+    : (data.error || 'Bulk add fail.');
+}
+init();
+</script>
+</body>
+</html>
