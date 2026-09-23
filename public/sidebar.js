@@ -62,6 +62,7 @@
     { href: '/assets.html', label: 'Assets', short: 'AST' },
     { href: '/add-asset.html', label: '+ Add Asset', short: '+ADD' },
     { href: '/bulk-add-asset.html', label: 'Bulk Add', short: 'BADD' },
+    { href: '/consumable.html', label: 'Consumable', short: 'CONS' },
     { href: '/settings.html', label: 'Settings', short: 'SET' }
   ];
 
