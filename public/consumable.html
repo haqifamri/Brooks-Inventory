@@ -1,11 +1,11 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<title>Assets - Brooks IT Inventory</title>
-<script src="/sidebar.js"></script>
-<style>
-  :root {
+  <meta charset="UTF-8">
+  <title>Consumables - Brooks IT Inventory</title>
+  <script src="/sidebar.js"></script>
+  <style>
+    :root {
     --brooks-bg: #f3f6fb;
     --brooks-bg-2: #edf3fb;
     --brooks-panel: #ffffff;
@@ -19,7 +19,7 @@
     --brooks-button-hover: linear-gradient(135deg, #64a9ff 0%, #3679eb 100%);
   }
 
-  body { font-family: Arial, sans-serif; background: linear-gradient(180deg, var(--brooks-bg) 0%, var(--brooks-bg-2) 100%); color: var(--brooks-text); }
+ body { font-family: Arial, sans-serif; background: linear-gradient(180deg, var(--brooks-bg) 0%, var(--brooks-bg-2) 100%); color: var(--brooks-text); }
   h1 { color: var(--brooks-accent-2); margin-top: 0; }
   .toolbar { display: flex; gap: 10px; margin: 16px 0; flex-wrap: wrap; align-items: center; }
   input, select { padding: 9px; border-radius: 6px; border: 1px solid var(--brooks-border); background: #ffffff; color: var(--brooks-text); }
@@ -49,38 +49,182 @@
   th, td { white-space: nowrap; }
   th:last-child, td:last-child { border-right: none; }
   #mainContent { max-width: none !important; }
-
   </style>
 </head>
 <body>
   <h1>Brooks IT Inventory - Consumables</h1>
 
-  <div class=""toolbar">
-    <input type="text" id="search" placeholder="Search by item name or location..." oninput="filterTable()">
-    <select id="locationFilter" onchange="filterTable()">
+  <div class="toolbar">
+    <input type="text" id="search" placeholder="Search item name or location...">
+    <select id="locationFilter">
       <option value="">All Locations</option>
     </select>
-    <select id="statusFilter" onchange="filterTable()">
+    <select id="statusFilter">
       <option value="">All Status Levels</option>
       <option value="Good">Good</option>
       <option value="Low">Low</option>
       <option value="Critical">Critical</option>
     </select>
     <a href="/add-consumable.html" class="add-btn">+ Add Consumable</a>
+  </div>
+
   <div class="count" id="count"></div>
+
   <div class="table-wrapper">
     <table>
       <thead>
         <tr>
-          <th><input type="checkbox" id="selectAll" onchange="toggleAll(this.checked)"></th>
           <th>Item Name</th>
           <th>Quantity</th>
+          <th>Minimum Stock</th>
+          <th>Unit</th>
           <th>Location</th>
+          <th>Supplier</th>
+          <th>Last Updated</th>
           <th>Status Level</th>
+          <th>Actions</th>
         </tr>
       </thead>
       <tbody id="tableBody"></tbody>
     </table>
   </div>
 
+  <div id="emptyState" class="empty">No consumables found.</div>
+
+  <script>
+    let allConsumables = [];
+
+    function getStatusLevel(item) {
+      const quantity = Number(item.quantity ?? 0);
+      const minimumStock = Number(item.minimum_stock ?? 0);
+      if (quantity <= 0) return 'Critical';
+      if (quantity <= minimumStock) return 'Low';
+      return 'Good';
+    }
+
+    function getStatusColor(status) {
+      if (status === 'Critical') return '#c1543a';
+      if (status === 'Low') return '#d97706';
+      return '#1f8f5f';
+    }
+
+    function formatDate(dateValue) {
+      if (!dateValue) return '-';
+      const date = new Date(dateValue);
+      if (Number.isNaN(date.getTime())) return dateValue;
+      return date.toLocaleDateString('en-CA');
+    }
+
+    function populateLocationFilter() {
+      const filter = document.getElementById('locationFilter');
+      const currentValue = filter.value;
+      const locations = [...new Set(allConsumables
+        .map(item => item.location)
+        .filter(Boolean))].sort((a, b) => a.localeCompare(b));
+
+      filter.innerHTML = '<option value="">All Locations</option>' +
+        locations.map(location => `<option value="${location}">${location}</option>`).join('');
+
+      filter.value = locations.includes(currentValue) ? currentValue : '';
+    }
+
+    function renderTable() {
+      const search = document.getElementById('search').value.toLowerCase();
+      const locationValue = document.getElementById('locationFilter').value;
+      const statusValue = document.getElementById('statusFilter').value;
+
+      const filtered = allConsumables.filter(item => {
+        const status = getStatusLevel(item);
+        const matchesSearch = !search ||
+          (item.item_name && item.item_name.toLowerCase().includes(search)) ||
+          (item.location && item.location.toLowerCase().includes(search));
+        const matchesLocation = !locationValue || item.location === locationValue;
+        const matchesStatus = !statusValue || status === statusValue;
+
+        return matchesSearch && matchesLocation && matchesStatus;
+      });
+
+      const tbody = document.getElementById('tableBody');
+      const count = document.getElementById('count');
+      const emptyState = document.getElementById('emptyState');
+
+      count.textContent = `${filtered.length} consumable(s)`;
+
+      if (!filtered.length) {
+        tbody.innerHTML = '';
+        emptyState.style.display = 'block';
+        return;
+      }
+
+      emptyState.style.display = 'none';
+
+      tbody.innerHTML = filtered.map(item => {
+        const status = getStatusLevel(item);
+        const color = getStatusColor(status);
+        return `
+          <tr>
+            <td>${item.item_name || '-'}</td>
+            <td>${item.quantity ?? 0}</td>
+            <td>${item.minimum_stock ?? 0}</td>
+            <td>${item.unit || '-'}</td>
+            <td>${item.location || '-'}</td>
+            <td>${item.supplier || '-'}</td>
+            <td>${formatDate(item.last_updated)}</td>
+            <td>
+              <span class="status-badge" style="background: ${color}18; border-color: ${color}55; color: #1f2937;">
+                <span class="status-dot" style="background: ${color};"></span>${status}
+              </span>
+            </td>
+            <td>
+              <div class="actions">
+                <a class="edit-btn" href="/add-consumable.html?id=${item.id}">Edit</a>
+                <button class="del-btn" onclick="deleteConsumable(${item.id})">Delete</button>
+              </div>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    async function loadConsumables() {
+      try {
+        const res = await fetch('/api/consumables');
+        const data = await res.json();
+
+        if (!res.ok) {
+          throw new Error(data.error || 'Unable to load consumables.');
+        }
+
+        allConsumables = data;
+        populateLocationFilter();
+        renderTable();
+      } catch (error) {
+        document.getElementById('count').textContent = error.message;
+        document.getElementById('tableBody').innerHTML = '';
+        document.getElementById('emptyState').style.display = 'block';
+        document.getElementById('emptyState').textContent = error.message;
+      }
+    }
+
+    async function deleteConsumable(id) {
+      if (!confirm('Delete this consumable item?')) return;
+
+      const res = await fetch(`/api/consumables/${id}`, { method: 'DELETE' });
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        alert(data.error || 'Unable to delete item.');
+        return;
+      }
+
+      await loadConsumables();
+    }
+
+    document.getElementById('search').addEventListener('input', renderTable);
+    document.getElementById('locationFilter').addEventListener('change', renderTable);
+    document.getElementById('statusFilter').addEventListener('change', renderTable);
+
+    loadConsumables();
+  </script>
 </body>
+</html>

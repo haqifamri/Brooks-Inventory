@@ -233,6 +233,261 @@ app.delete('/api/models/:id', async (req, res) => {
   }
 });
 
+// ===== CONSUMABLES =====
+app.get('/api/consumables', async (req, res) => {
+  const connection = await mysql.createConnection(dbConfig);
+  try {
+    const [rows] = await connection.query(`
+      SELECT
+        id,
+        item_name,
+        quantity,
+        minimum_stock,
+        unit,
+        location,
+        supplier,
+        last_updated,
+        CASE
+          WHEN quantity <= 0 THEN 'Critical'
+          WHEN quantity <= minimum_stock THEN 'Low'
+          ELSE 'Good'
+        END AS status_level
+      FROM consumables
+      ORDER BY item_name ASC
+    `);
+    res.json(rows);
+  } catch (error) {
+    if (error.code === 'ER_NO_SUCH_TABLE') {
+      return res.status(400).json({
+        error: 'Table consumables belum wujud. Sila buat table MySQL berikut terlebih dahulu.'
+      });
+    }
+    res.status(500).json({ error: error.message });
+  } finally {
+    await connection.end();
+  }
+});
+
+app.get('/api/consumables/low-stock', async (req, res) => {
+  let connection;
+  try {
+    connection = await mysql.createConnection(dbConfig);
+    const [rows] = await connection.query(`
+      SELECT
+        id,
+        item_name,
+        quantity,
+        minimum_stock,
+        unit,
+        location,
+        supplier,
+        last_updated,
+        CASE
+          WHEN quantity <= 0 THEN 'Critical'
+          WHEN quantity <= minimum_stock THEN 'Low'
+          ELSE 'Good'
+        END AS status_level
+      FROM consumables
+      WHERE quantity <= minimum_stock OR quantity = 0
+      ORDER BY quantity ASC, item_name ASC
+    `);
+    res.json(rows);
+  } catch (error) {
+    if (error.code === 'ER_NO_SUCH_TABLE') {
+      return res.status(400).json({
+        error: 'Table consumables belum wujud. Sila buat table MySQL berikut terlebih dahulu.'
+      });
+    }
+    if (error.name === 'AggregateError' || error.code === 'ECONNREFUSED') {
+      return res.status(503).json({
+        error: 'Database unavailable. Start the MySQL server and verify DB_HOST in .env.'
+      });
+    }
+    res.status(500).json({ error: error.message });
+  } finally {
+    if (connection) await connection.end();
+  }
+});
+
+app.get('/api/consumables/export', async (req, res) => {
+  const connection = await mysql.createConnection(dbConfig);
+  try {
+    const [rows] = await connection.query(`
+      SELECT
+        item_name,
+        quantity,
+        minimum_stock,
+        unit,
+        location,
+        supplier,
+        last_updated,
+        CASE
+          WHEN quantity <= 0 THEN 'Critical'
+          WHEN quantity <= minimum_stock THEN 'Low'
+          ELSE 'Good'
+        END AS status_level
+      FROM consumables
+      ORDER BY item_name ASC
+    `);
+    res.json({
+      exported_at: new Date().toISOString(),
+      items: rows
+    });
+  } catch (error) {
+    if (error.code === 'ER_NO_SUCH_TABLE') {
+      return res.status(400).json({
+        error: 'Table consumables belum wujud. Sila buat table MySQL berikut terlebih dahulu.'
+      });
+    }
+    res.status(500).json({ error: error.message });
+  } finally {
+    await connection.end();
+  }
+});
+
+app.post('/api/consumables', async (req, res) => {
+  const connection = await mysql.createConnection(dbConfig);
+  try {
+    const {
+      item_name,
+      quantity,
+      minimum_stock,
+      unit,
+      location,
+      supplier,
+      last_updated
+    } = req.body;
+
+    if (!item_name || quantity === undefined || minimum_stock === undefined) {
+      await connection.end();
+      return res.status(400).json({ error: 'item_name, quantity, dan minimum_stock diperlukan' });
+    }
+
+    const [result] = await connection.query(
+      `INSERT INTO consumables (item_name, quantity, minimum_stock, unit, location, supplier, last_updated)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [
+        item_name,
+        Number(quantity),
+        Number(minimum_stock),
+        unit || null,
+        location || null,
+        supplier || null,
+        last_updated || new Date()
+      ]
+    );
+
+    res.status(201).json({ id: result.insertId, item_name, quantity, minimum_stock });
+  } catch (error) {
+    if (error.code === 'ER_NO_SUCH_TABLE') {
+      return res.status(400).json({
+        error: 'Table consumables belum wujud. Sila buat table MySQL berikut terlebih dahulu.'
+      });
+    }
+    res.status(500).json({ error: error.message });
+  } finally {
+    await connection.end();
+  }
+});
+
+app.get('/api/consumables/:id', async (req, res) => {
+  const connection = await mysql.createConnection(dbConfig);
+  try {
+    const [rows] = await connection.query(`
+      SELECT
+        id,
+        item_name,
+        quantity,
+        minimum_stock,
+        unit,
+        location,
+        supplier,
+        last_updated
+      FROM consumables
+      WHERE id = ?
+    `, [req.params.id]);
+
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'Consumable tidak dijumpai.' });
+    }
+
+    res.json(rows[0]);
+  } catch (error) {
+    if (error.code === 'ER_NO_SUCH_TABLE') {
+      return res.status(400).json({
+        error: 'Table consumables belum wujud. Sila buat table MySQL berikut terlebih dahulu.'
+      });
+    }
+    res.status(500).json({ error: error.message });
+  } finally {
+    await connection.end();
+  }
+});
+
+app.put('/api/consumables/:id', async (req, res) => {
+  const connection = await mysql.createConnection(dbConfig);
+  try {
+    const {
+      item_name,
+      quantity,
+      minimum_stock,
+      unit,
+      location,
+      supplier,
+      last_updated
+    } = req.body;
+
+    if (!item_name || quantity === undefined || minimum_stock === undefined) {
+      await connection.end();
+      return res.status(400).json({ error: 'item_name, quantity, dan minimum_stock diperlukan' });
+    }
+
+    await connection.query(
+      `UPDATE consumables
+       SET item_name = ?, quantity = ?, minimum_stock = ?, unit = ?, location = ?, supplier = ?, last_updated = ?
+       WHERE id = ?`,
+      [
+        item_name,
+        Number(quantity),
+        Number(minimum_stock),
+        unit || null,
+        location || null,
+        supplier || null,
+        last_updated || new Date(),
+        req.params.id
+      ]
+    );
+
+    res.json({ success: true });
+  } catch (error) {
+    if (error.code === 'ER_NO_SUCH_TABLE') {
+      return res.status(400).json({
+        error: 'Table consumables belum wujud. Sila buat table MySQL berikut terlebih dahulu.'
+      });
+    }
+    res.status(500).json({ error: error.message });
+  } finally {
+    await connection.end();
+  }
+});
+
+app.delete('/api/consumables/:id', async (req, res) => {
+  const connection = await mysql.createConnection(dbConfig);
+  try {
+    await connection.query('DELETE FROM consumables WHERE id = ?', [req.params.id]);
+    res.json({ success: true });
+  } catch (error) {
+    if (error.code === 'ER_NO_SUCH_TABLE') {
+      return res.status(400).json({
+        error: 'Table consumables belum wujud. Sila buat table MySQL berikut terlebih dahulu.'
+      });
+    }
+    res.status(500).json({ error: error.message });
+  } finally {
+    await connection.end();
+  }
+});
+
 // ===== ASSETS =====
 app.get('/api/assets', async (req, res) => {
   try {

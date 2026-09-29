@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Add Consumable</title>
+  <script src="/sidebar.js"></script>
+  <style>
+    :root {
+      --brooks-bg: #f3f6fb;
+      --brooks-bg-2: #edf3fb;
+      --brooks-panel: #ffffff;
+      --brooks-card: #ffffff;
+      --brooks-border: #dfe7f0;
+      --brooks-text: #1f2937;
+      --brooks-muted: #5d6b7a;
+      --brooks-accent: #2d6cdf;
+      --brooks-accent-2: #1a4f8a;
+      --brooks-button: linear-gradient(135deg, #4e96ff 0%, #2d6cdf 100%);
+      --brooks-button-hover: linear-gradient(135deg, #64a9ff 0%, #3679eb 100%);
+    }
+
+    body {
+      font-family: Arial, sans-serif;
+      background: linear-gradient(180deg, var(--brooks-bg) 0%, var(--brooks-bg-2) 100%);
+      color: var(--brooks-text);
+    }
+
+    h1 { color: var(--brooks-accent-2); margin-top: 0; }
+
+    .top-actions { margin-bottom: 16px; }
+    .btn-back {
+      background: #edf3fb;
+      color: var(--brooks-text);
+      padding: 8px 16px;
+      border-radius: 6px;
+      font-size: 13px;
+      text-decoration: none;
+      border: 1px solid var(--brooks-border);
+      cursor: pointer;
+    }
+    .btn-back:hover { background: #e2ebf8; }
+
+    .form-box {
+      background: #ffffff;
+      padding: 24px;
+      border-radius: 10px;
+      max-width: 800px;
+      border: 1px solid var(--brooks-border);
+      box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
+    }
+
+    .row { display: flex; gap: 12px; margin-bottom: 14px; }
+    .field { flex: 1; display: flex; flex-direction: column; }
+    label {
+      font-size: 12px;
+      color: var(--brooks-muted);
+      margin-bottom: 4px;
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+    }
+    input, select {
+      padding: 9px;
+      border-radius: 6px;
+      border: 1px solid var(--brooks-border);
+      background: #ffffff;
+      color: var(--brooks-text);
+      font-family: inherit;
+      font-size: 14px;
+    }
+
+    .required { color: #c1543a; }
+    .hint { font-size: 12px; color: var(--brooks-muted); margin: -6px 0 12px; }
+
+    .submit-btn {
+      padding: 12px 20px;
+      background: var(--brooks-button);
+      color: #ffffff;
+      border: none;
+      border-radius: 6px;
+      font-weight: bold;
+      cursor: pointer;
+      font-size: 14px;
+      margin-top: 10px;
+      box-shadow: 0 8px 18px rgba(45, 108, 223, 0.18);
+    }
+    .submit-btn:hover { background: var(--brooks-button-hover); }
+
+    #msg { margin-top: 12px; font-size: 14px; }
+    .msg-success { color: #1f8f5f; }
+    .msg-error { color: #c1543a; }
+  </style>
+</head>
+<body>
+  <div class="top-actions">
+    <a class="btn-back" href="/consumable.html">&larr; Back to Consumables</a>
+  </div>
+
+  <h1 id="pageTitle">Add Consumable</h1>
+
+  <div class="form-box">
+    <div class="hint">Track stock levels, suppliers, and minimum stock alerts.</div>
+
+    <div class="row">
+      <div class="field">
+        <label>Item Name <span class="required">*</span></label>
+        <input type="text" id="item_name">
+      </div>
+      <div class="field">
+        <label>Supplier</label>
+        <input type="text" id="supplier">
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="field">
+        <label>Quantity <span class="required">*</span></label>
+        <input type="number" id="quantity" min="0" step="1">
+      </div>
+      <div class="field">
+        <label>Minimum Stock <span class="required">*</span></label>
+        <input type="number" id="minimum_stock" min="0" step="1">
+      </div>
+      <div class="field">
+        <label>Unit</label>
+        <input type="text" id="unit" placeholder="e.g. pcs, box, bottle">
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="field">
+        <label>Location</label>
+        <input type="text" id="location">
+      </div>
+      <div class="field">
+        <label>Last Updated</label>
+        <input type="date" id="last_updated">
+      </div>
+    </div>
+
+    <button class="submit-btn" onclick="saveConsumable()">Save Consumable</button>
+    <div id="msg"></div>
+  </div>
+
+  <script>
+    const params = new URLSearchParams(window.location.search);
+    const consumableId = params.get('id');
+
+    async function loadConsumable() {
+      if (!consumableId) return;
+
+      const res = await fetch(`/api/consumables/${consumableId}`);
+      const data = await res.json();
+
+      if (!res.ok) {
+        document.getElementById('msg').className = 'msg-error';
+        document.getElementById('msg').textContent = data.error || 'Unable to load consumable.';
+        return;
+      }
+
+      document.getElementById('pageTitle').textContent = 'Edit Consumable';
+      document.getElementById('item_name').value = data.item_name || '';
+      document.getElementById('supplier').value = data.supplier || '';
+      document.getElementById('quantity').value = data.quantity ?? 0;
+      document.getElementById('minimum_stock').value = data.minimum_stock ?? 0;
+      document.getElementById('unit').value = data.unit || '';
+      document.getElementById('location').value = data.location || '';
+      const dateValue = data.last_updated ? new Date(data.last_updated).toISOString().slice(0, 10) : '';
+      document.getElementById('last_updated').value = dateValue;
+    }
+
+    async function saveConsumable() {
+      const msg = document.getElementById('msg');
+      const payload = {
+        item_name: document.getElementById('item_name').value.trim(),
+        quantity: Number(document.getElementById('quantity').value),
+        minimum_stock: Number(document.getElementById('minimum_stock').value),
+        unit: document.getElementById('unit').value.trim(),
+        location: document.getElementById('location').value.trim(),
+        supplier: document.getElementById('supplier').value.trim(),
+        last_updated: document.getElementById('last_updated').value || new Date().toISOString()
+      };
+
+      if (!payload.item_name) {
+        msg.className = 'msg-error';
+        msg.textContent = 'Please enter an item name.';
+        return;
+      }
+      if (Number.isNaN(payload.quantity) || Number.isNaN(payload.minimum_stock)) {
+        msg.className = 'msg-error';
+        msg.textContent = 'Quantity and minimum stock must be valid numbers.';
+        return;
+      }
+
+      const endpoint = consumableId ? `/api/consumables/${consumableId}` : '/api/consumables';
+      const method = consumableId ? 'PUT' : 'POST';
+
+      const res = await fetch(endpoint, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      const data = await res.json();
+      if (res.ok) {
+        msg.className = 'msg-success';
+        msg.textContent = consumableId ? 'Consumable updated successfully!' : 'Consumable saved successfully!';
+        setTimeout(() => { window.location.href = '/consumable.html'; }, 800);
+      } else {
+        msg.className = 'msg-error';
+        msg.textContent = data.error || 'Unable to save consumable.';
+      }
+    }
+
+    loadConsumable();
+  </script>
+</body>
+</html>
