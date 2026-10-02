@@ -2,8 +2,107 @@
 const mysql = require('mysql2/promise');
 require('dotenv').config();
 
+const nodemailer = require('nodemailer');
+
+const mailer = nodemailer.createTransport({
+  host: process.env.SMTP_HOST,
+  port: Number(process.env.SMTP_PORT || 587),
+  secure: process.env.SMTP_SECURE === 'true',
+  auth: {
+    user: process.env.SMTP_USER?.trim(),
+    pass: process.env.SMTP_PASS?.replace(/\s/g, '')
+  }
+});
+
+function escapeHtml(value) {
+  const entities = {
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;'
+  };
+  return String(value).replace(/[&<>"']/g, (char) => entities[char]);
+}
+
+async function checkLowStockAndEmail() {
+  const response = await fetch('http://localhost:3000/api/consumables/low-stock');
+
+  if (!response.ok) {
+    throw new Error(`Low-stock API returned HTTP ${response.status}`);
+  }
+
+  const items = await response.json();
+  if (items.length === 0) {
+    console.log("Low-stock check: no items need reordering.");
+    return;
+  }
+
+  const rows = items.map(item => `
+    <tr>
+      <td>${escapeHtml(item.item_name)}</td>
+      <td>${escapeHtml(item.quantity)}</td>
+      <td>${escapeHtml(item.minimum_stock)}</td>
+      <td>${escapeHtml(item.location)}</td>
+      <td>${escapeHtml(item.supplier)}</td>
+    </tr>
+  `).join('');
+
+  await mailer.sendMail({
+    from: process.env.SMTP_USER,
+    to: process.env.LOW_STOCK_EMAIL_TO,
+    subject: 'Low Stock Alert - Brooks Inventory',
+    text: items.map(item =>
+      `${item.item_name}: ${item.quantity} ${item.unit || ''} (minimum ${item.minimum_stock}) - ${item.location || 'No location'}`
+    ).join('\n'),
+    html: `
+        <h3>Low Stock Warning</h3>
+      <p>These consumables are below minimum stock:</p>
+      <table border="1" cellpadding="6" cellspacing="0">
+        <thead>
+          <tr><th>Item Name</th><th>Qty</th><th>Min</th><th>Location</th><th>Supplier</th></tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+      <p>Please reorder as needed.</p>
+    `
+  });
+
+  console.log(`Low-stock email sent for ${items.length} item(s).`);
+}
+
 const app = express();
-const PORT = 3000;
+const PORT = Number(process.env.PORT || 3000);
+
+async function startLowStockMonitor() {
+  if (
+    !process.env.SMTP_HOST ||
+    !process.env.SMTP_USER ||
+    !process.env.SMTP_PASS ||
+    !process.env.LOW_STOCK_EMAIL_TO
+  ) {
+    console.warn('Low-stock email disabled: SMTP settings are missing.');
+    return;
+  }
+
+  try {
+    await mailer.verify();
+  } catch (error) {
+    console.warn('Low-stock email disabled: SMTP authentication failed. Use a valid Gmail App Password for SMTP_USER/SMTP_PASS.');
+    console.warn(error.message);
+    return;
+  }
+
+  const runCheck = () => checkLowStockAndEmail().catch(error => {
+    console.error('Low-stock email check failed:', error.message);
+  });
+
+  runCheck();
+  setInterval(
+    runCheck,
+    Number(process.env.LOW_STOCK_INTERVAL_MS || 86400000)
+  );
+}
 
 app.use(express.json());
 app.use(express.static('public'));
@@ -807,6 +906,7 @@ app.delete('/api/assets/:id', async (req, res) => {
   }
 });
 
-app.listen(PORT, () => {
+app.listen(PORT, async () => {
   console.log(`🚀 Server berjalan di http://localhost:${PORT}`);
+  await startLowStockMonitor();
 });
